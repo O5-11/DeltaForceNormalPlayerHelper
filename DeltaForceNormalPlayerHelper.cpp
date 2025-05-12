@@ -1,4 +1,4 @@
-﻿
+
 #include "c:\Head\Head.h"
 #include "shellapi.h"
 #include "vector"
@@ -21,12 +21,9 @@ bool Exit = false;
 void StopServiceSimple(const char* serviceName) {
     std::string cmd = "net stop \"" + std::string(serviceName) + "\"";
     system(cmd.c_str());
+    return;
 }
 
-void StopService(const wchar_t* serviceName) {
-    std::wstring cmd = L"net stop \"" + std::wstring(serviceName) + L"\"";
-    _wsystem(cmd.c_str());
-}
 
 class SwitchPanle {
 
@@ -124,18 +121,6 @@ public:
     };
 };
 
-typedef struct Data
-{
-    char Name[EXENAMELEN];
-    char* ExePath;
-    ULONG pID;
-    bool FindState;
-    ISimpleAudioVolume* Controler;
-    HBITMAP hBitmap;
-}Data;
-
-vector<Data>List;
-
 HMENU hMenu = NULL;
 HMENU childhMenu = NULL;
 HMENU settinghMenu = NULL;
@@ -208,320 +193,6 @@ public:
         CoUninitialize();
     };
 
-    bool GetDeviceName()
-    {
-        if (!Initialized)
-        {
-            MBX("环境初始化失败");
-            return false;
-        }
-
-        //获取当前激活设备名
-        m_pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
-
-        try {
-            HRESULT hrest = pDevice->OpenPropertyStore(STGM_READ, &pPropertyStore);
-            if (SUCCEEDED(hrest)) {
-                hrest = pPropertyStore->GetValue(PKEY_DeviceInterface_FriendlyName, &pv);
-                if (SUCCEEDED(hrest) && VT_EMPTY != pv.vt) {
-                    wcscat(wszDeviceName, pv.pwszVal);
-                }
-            }
-        }
-        catch (std::exception&) {
-        }
-
-        m_pEnumerator->Release();
-    };
-
-    void GetpIDList()
-    {
-        if (!Initialized)
-        {
-            MBX("环境初始化失败");
-            return;
-        }
-
-        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-
-        m_pEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pMultiDevice);
-        m_pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
-
-        pDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&pASManager);
-        hr = pASManager->GetSessionEnumerator(&pSessionEnum);
-        pASManager->GetAudioSessionControl(nullptr, 0, &pASControl);
-
-        int num = 0;
-        TCHAR* processName = new TCHAR[MAX_PATH]; memset(processName, 0, sizeof(TCHAR) * MAX_PATH);
-
-        pSessionEnum->GetCount(&num);
-
-        for (int i = 0; i < num; i++)
-        {
-            pSessionEnum->GetSession(i, &pASControl);
-            hr = pASControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pASControl2);
-
-            if (SUCCEEDED(hr)) {
-                DWORD processId = 0;
-                pASControl2->GetProcessId(&processId);
-
-                if (processId != 0)
-                {
-                    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-                    if (hProcess) {
-                        if (GetModuleBaseName(hProcess, NULL, processName, MAX_PATH)) {
-
-                            char* processCharName = NULL;
-                            processCharName = LPWSTRTopChar(processName);
-
-                            for (int i = 0; i < List.size(); i++)
-                            {
-                                if (strcmp(List[i].Name, processCharName) == 0)
-                                {
-                                    hr = pASControl2->QueryInterface(IID_ISimpleAudioVolume, (void**)&pSimplevol);
-                                    if (FAILED(hr))
-                                    {
-                                        delete[]processCharName;
-                                        continue;
-                                    }
-
-                                    List[i].FindState = true;
-                                    List[i].pID = processId;
-                                    List[i].Controler = pSimplevol;
-                                }
-                            }
-
-                            if (processCharName != NULL)
-                                delete[]processCharName;
-                        }
-
-                        CloseHandle(hProcess);
-                    }
-                }
-            }
-
-            pASControl2->Release();
-        }
-
-        pASControl->Release();
-        pSessionEnum->Release();
-        pASManager->Release();
-        pDevice->Release();
-
-        if (processName)
-            delete[]processName;
-    };
-
-    void GetpIDList_COP()
-    {
-        if (!SUCCEEDED(CoInitialize(NULL)))
-        {
-            MBX("环境初始化失败");
-            return;
-        }
-
-        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-
-        //m_pEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pMultiDevice);
-        m_pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
-
-        pDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&pASManager);
-        hr = pASManager->GetSessionEnumerator(&pSessionEnum);
-        //pASManager->GetAudioSessionControl(nullptr, 0, &pASControl);
-
-        int num = 0;
-        pSessionEnum->GetCount(&num);
-
-        for (int i = 0; i < num && SINGLE; i++)
-        {
-            pSessionEnum->GetSession(i, &pASControl);
-            hr = pASControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pASControl2);
-
-            if (SUCCEEDED(hr)) {
-                DWORD processId = 0;
-                pASControl2->GetProcessId(&processId);
-
-                if (processId != 0)
-                {
-                    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-                    if (hProcess) {
-                        char* processName = NewStr(MAX_PATH);
-                        if (GetModuleBaseNameA(hProcess, NULL, processName, MAX_PATH)) {
-
-                            for (int j = 0; j < List.size() && SINGLE; j++)
-                            {
-                                if (strcmp(List[j].Name, processName) == 0 && List[j].FindState == false)
-                                {
-                                    hr = pASControl2->QueryInterface(IID_ISimpleAudioVolume, (void**)&pSimplevol);
-                                    if (SUCCEEDED(hr))
-                                    {
-                                        List[j].FindState = true;
-                                        List[j].pID = processId;
-                                        List[j].Controler = pSimplevol;
-                                        List[j].ExePath = NewStr(EXENAMELEN);
-                                        DWORD len = EXENAMELEN;
-                                        if (!QueryFullProcessImageNameA(hProcess, 0, List[j].ExePath, &len)) {
-                                            delete[] List[i].ExePath;
-                                            List[i].ExePath = nullptr;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        delete[] processName;
-                        CloseHandle(hProcess);
-                    }
-                }
-            }
-
-            pASControl2->Release();
-            pASControl2 = nullptr;
-            pASControl->Release();
-            pASControl = nullptr;
-        }
-
-        pSessionEnum->Release();
-        pSessionEnum = nullptr;
-        pASManager->Release();
-        pASManager = nullptr;
-        pDevice->Release();
-        pDevice = nullptr;
-        m_pEnumerator->Release();
-        m_pEnumerator = nullptr;
-        CoUninitialize();
-        return;
-    }
-
-    void ShowAllVolum()
-    {
-        if (!SUCCEEDED(CoInitialize(NULL)))
-        {
-            MBX("环境初始化失败");
-            return;
-        }
-
-        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-
-        m_pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
-
-        pDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&pASManager);
-        hr = pASManager->GetSessionEnumerator(&pSessionEnum);
-
-        int num = 0;
-        pSessionEnum->GetCount(&num);
-
-        for (int i = 0; i < num; i++)
-        {
-            pSessionEnum->GetSession(i, &pASControl);
-            hr = pASControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pASControl2);
-
-            if (SUCCEEDED(hr)) {
-                DWORD processId = 0;
-                pASControl2->GetProcessId(&processId);
-
-                HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-                if (hProcess) {
-                    char* processName = NewStr(MAX_PATH);
-                    DWORD size = MAX_PATH;
-                    if (QueryFullProcessImageNameA(hProcess, 0, processName, &size)) {
-                        wchar_t* WprocessName = pCharToLPWSTR(processName);
-                        cout << "PID:" << processId << " --> ";
-                        wcout << WprocessName << endl;
-                        if(WprocessName)
-                            delete[] WprocessName;
-                    }
-                    delete[] processName;
-                    CloseHandle(hProcess);
-                }
-            }
-
-            pASControl2->Release();
-            pASControl2 = nullptr;
-            pASControl->Release();
-            pASControl = nullptr;
-        }
-
-        pSessionEnum->Release();
-        pSessionEnum = nullptr;
-        pASManager->Release();
-        pASManager = nullptr;
-        pDevice->Release();
-        pDevice = nullptr;
-        m_pEnumerator->Release();
-        m_pEnumerator = nullptr;
-        CoUninitialize();
-    }
-
-    ULONG SelectVolumContorlByFullName(char* FullName)
-    {
-        bool fined = false;
-        ULONG PID = 0;
-
-        if (!SUCCEEDED(CoInitialize(NULL)))
-        {
-            MBX("环境初始化失败");
-            return 0;
-        }
-
-        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-
-        m_pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, &pDevice);
-
-        pDevice->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, (void**)&pASManager);
-        hr = pASManager->GetSessionEnumerator(&pSessionEnum);
-
-        int num = 0;
-        pSessionEnum->GetCount(&num);
-
-        for (int i = 0; i < num; i++)
-        {
-            pSessionEnum->GetSession(i, &pASControl);
-            hr = pASControl->QueryInterface(__uuidof(IAudioSessionControl2), (void**)&pASControl2);
-
-            if (SUCCEEDED(hr)) {
-                DWORD processId = 0;
-                pASControl2->GetProcessId(&processId);
-
-                HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-                if (hProcess) {
-                    char* processName = NewStr(MAX_PATH);
-                    DWORD size = MAX_PATH;
-                    if (QueryFullProcessImageNameA(hProcess, 0, processName, &size)) {
-                        wchar_t* WprocessName = pCharToLPWSTR(processName);
-                        if (strcmp(processName, FullName) == 0)
-                        {
-                            fined = true;
-                            PID = processId;
-                        }
-                        cout << "PID:" << processId << " --> ";
-                        wcout << WprocessName << endl;
-                        if (WprocessName)
-                            delete[] WprocessName;
-                    }
-                    delete[] processName;
-                    CloseHandle(hProcess);
-                }
-            }
-
-            pASControl2->Release();
-            pASControl2 = nullptr;
-            pASControl->Release();
-            pASControl = nullptr;
-            if (fined)break;
-        }
-
-        pSessionEnum->Release();
-        pSessionEnum = nullptr;
-        pASManager->Release();
-        pASManager = nullptr;
-        pDevice->Release();
-        pDevice = nullptr;
-        m_pEnumerator->Release();
-        m_pEnumerator = nullptr;
-        CoUninitialize();
-        return PID;
-    }
-
     ISimpleAudioVolume* GetContorl(ULONG PID)
     {
         bool Find = false;
@@ -587,85 +258,6 @@ public:
         return false;
     }
 
-    //弃用
-    ISimpleAudioVolume* GetTargetProcessVolumeControl(ULONG TargetpId)
-    {
-        /*hr = CoCreateGuid(&m_guidMyContext);
-        if (FAILED(hr))
-            return FALSE;*/
-            // Get enumerator for audio endpoint devices.  
-
-
-            /*if (IsMixer)
-            {
-                hr = m_pEnumerator->EnumAudioEndpoints(eRender,DEVICE_STATE_ACTIVE, &pMultiDevice);
-            }
-            else
-            {
-                hr = m_pEnumerator->EnumAudioEndpoints(eCapture,DEVICE_STATE_ACTIVE, &pMultiDevice);
-            } */
-        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-
-        hr = m_pEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pMultiDevice);
-        if (FAILED(hr))
-            return FALSE;
-
-        UINT deviceCount = 0;
-        hr = pMultiDevice->GetCount(&deviceCount);
-        if (FAILED(hr))
-            return FALSE;
-
-        for (UINT ii = 0; ii < deviceCount; ii++)
-        {
-            pDevice = NULL;
-            hr = pMultiDevice->Item(ii, &pDevice);
-            if (FAILED(hr))
-                return FALSE;
-            hr = pDevice->Activate(__uuidof(IAudioSessionManager), CLSCTX_ALL, NULL, (void**)&pASManager);
-
-            if (FAILED(hr))
-                return FALSE;
-            hr = pASManager->GetSessionEnumerator(&pSessionEnum);
-            if (FAILED(hr))
-                return FALSE;
-            int nCount;
-            hr = pSessionEnum->GetCount(&nCount);
-
-            for (int i = 0; i < nCount; i++)
-            {
-                IAudioSessionControl* pSessionCtrl;
-                hr = pSessionEnum->GetSession(i, &pSessionCtrl);
-                if (FAILED(hr))
-                    continue;
-                IAudioSessionControl2* pSessionCtrl2;
-                hr = pSessionCtrl->QueryInterface(IID_IAudioSessionControl2, (void**)&pSessionCtrl2);
-                if (FAILED(hr))
-                    continue;
-                ULONG pid;
-                hr = pSessionCtrl2->GetProcessId(&pid);
-                if (FAILED(hr))
-                    continue;
-
-                hr = pSessionCtrl2->QueryInterface(IID_ISimpleAudioVolume, (void**)&pSimplevol);
-                if (FAILED(hr))
-                    continue;
-
-                if (pid == TargetpId && TargetpId != 0 && pid != 0)
-                {
-                    m_pEnumerator->Release();
-                    return pSimplevol;
-                    /*pSimplevol->SetMasterVolume((float)dwVolume/100, NULL);
-
-                    if (dwVolume == 0)
-                        pSimplevol->SetMute(true, NULL);*/
-                }
-            }
-        }
-
-        m_pEnumerator->Release();
-        return NULL;
-    }
-
     bool IsMuted(ISimpleAudioVolume* ISAV)
     {
         BOOL state = false;
@@ -716,7 +308,6 @@ void SimulateShiftKey(bool press)
     }
 }
 
-
 void CloseAntiCheat(void* args) {
     Wait(30);
     StopServiceSimple("AntiCheatExpert Service");
@@ -743,7 +334,11 @@ void AutoKnife(void* args)
                 PressKey('1');
                 Sleep(1);
             }
+
+            Sleep(100);
         }
+
+        Sleep(100);
     }
 }
 
@@ -789,66 +384,67 @@ void StopBreatheWhileFire(void* args)
             bShiftPressed = false;
         }
 
-        Sleep(10); // 适当降低CPU占用
+        Sleep(100); // 适当降低CPU占用
     }
 }
 
-void StopBreatheWhileFire_SI(void* args)
-{
+void Slide(void* args) {
+
     HWND hwnd = *((HWND*)args);
-    bool bShiftPressed = false;
-    ULONGLONG lastCheckTime = 0;
+    bool bNumPad0Pressed = false;
+
+    INPUT keyDown = { 0 };
+    keyDown.type = INPUT_KEYBOARD;
+    keyDown.ki.wVk = 'W';
+
+    INPUT keyUp = { 0 };
+    keyUp.type = INPUT_KEYBOARD;
+    keyUp.ki.wVk = 'W';
+    keyUp.ki.dwFlags = KEYEVENTF_KEYUP;
+
+    INPUT numDown = { 0 };
+    numDown.type = INPUT_KEYBOARD;
+    numDown.ki.wVk = VK_NUMPAD0;
+
+    INPUT numUp = { 0 };
+    numUp.type = INPUT_KEYBOARD;
+    numUp.ki.wVk = VK_NUMPAD0;
+    numUp.ki.dwFlags = KEYEVENTF_KEYUP;
+
 
     while (!Exit)
     {
-        ULONGLONG currentTime = GetTickCount64();
-
-        // 每10ms检测一次（降低CPU占用）
-        if (currentTime - lastCheckTime >= 10)
+        if (GetForegroundWindow() == hwnd)
         {
-            lastCheckTime = currentTime;
-
-            if (GetForegroundWindow() == hwnd)
-            {
-                bool bRightDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000);
-                bool bLeftDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000);
-
-                if (bRightDown)
-                {
-                    if (bLeftDown && !bShiftPressed)
-                    {
-                        SimulateShiftKey(true);
-                        bShiftPressed = true;
-                    }
-                    else if (!bLeftDown && bShiftPressed)
-                    {
-                        SimulateShiftKey(false);
-                        bShiftPressed = false;
-                    }
+            // 检测侧键2是否按下
+            if (GetAsyncKeyState(VK_XBUTTON2) & 0x8000) {
+                if (!bNumPad0Pressed) {
+                    
+                    SendInput(1, &numDown, sizeof(INPUT));
+                    bNumPad0Pressed = true;
                 }
-                else if (bShiftPressed) // 右键松开时强制释放
-                {
-                    SimulateShiftKey(false);
-                    bShiftPressed = false;
+
+                // 按下W键
+                SendInput(1, &keyDown, sizeof(INPUT));
+
+                // 保持按下状态50毫秒
+                Sleep(50);
+
+                // 释放W键
+                SendInput(1, &keyUp, sizeof(INPUT));
+
+                // 控制操作频率（总间隔时间 = 保持时间 + 间隔时间）
+                Sleep(30); // 可根据需要调整这个间隔
+            }
+            else {
+                if (bNumPad0Pressed) {
+                    SendInput(1, &numUp, sizeof(INPUT));
+                    bNumPad0Pressed = false;
                 }
             }
-            else if (bShiftPressed) // 窗口失去焦点时释放
-            {
-                SimulateShiftKey(false);
-                bShiftPressed = false;
-            }
         }
-        else
-        {
-            // 精确控制等待时间
-            DWORD remaining = (DWORD)(10 - (currentTime - lastCheckTime));
-            Sleep(remaining > 10 ? 10 : remaining);
-        }
-    }
-
-    // 退出前确保释放Shift
-    if (bShiftPressed) {
-        SimulateShiftKey(false);
+        // 降低CPU占用
+        Sleep(10);
     }
 }
 
@@ -862,8 +458,8 @@ int main()
     }
 
     SimpleThread ST;
-    HWND self = initgraph(360, 160), hwnd = NULL, hw = NULL;
-    SetWindowTextA(self,"八宝粥绿玩四合一");
+    HWND self = initgraph(360, 160), hwnd = NULL, hw = NULL,launcher = NULL;
+    SetWindowTextA(self,"八宝粥绿玩五合一");
     SwitchPanle SP;
     DWORD PID;
     POINT pos;
@@ -879,6 +475,7 @@ begin:
     SV = nullptr;
     hwnd = NULL;
     hw = NULL;
+    launcher = NULL;
     Exit = false;
 
     while (hwnd == NULL)
@@ -888,10 +485,14 @@ begin:
     }
 
     GetWindowThreadProcessId(hwnd, &PID);
+    launcher = FindWindowA("TWINCONTROL", "三角洲行动");
  
     ST.StartThread(CloseAntiCheat, NULL);
     ST.StartThread(AutoKnife, &hwnd);
     ST.StartThread(StopBreatheWhileFire, &hwnd);
+    ST.StartThread(Slide, &hwnd);
+
+    SendMessageA(launcher, WM_CLOSE, 0, 0);
 
     while (SV == nullptr)
     {
@@ -929,6 +530,6 @@ begin:
             goto begin;
         }
 
-        Sleep(10);
+        Sleep(100);
     }
 }

@@ -448,6 +448,38 @@ void Slide(void* args) {
     }
 }
 
+void Flasher(void* args)
+{
+    bool* open = (bool*)args;
+    while (*open)
+    {
+        PressKey('Y');
+    }
+}
+
+void UnlimitedFlash(void* args)
+{
+    SimpleThread ST;
+    HWND hwnd = *((HWND*)args);
+    bool Flash = false;
+    while (Exit == false)
+    {
+        if (GetForegroundWindow() == hwnd)
+        {
+            if ((GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0)
+            {
+                Flash = true;
+                ST.StartThread(Flasher, &Flash);
+                Wait(7);
+                Flash = false;
+            }
+            Sleep(10);
+        }
+
+        Sleep(100);
+    }
+}
+
 int main()
 {
     HANDLE mutex;
@@ -459,7 +491,7 @@ int main()
 
     SimpleThread ST;
     HWND self = initgraph(360, 160), hwnd = NULL, hw = NULL,launcher = NULL;
-    SetWindowTextA(self,"八宝粥绿玩五合一");
+    SetWindowTextA(self,"八宝粥绿玩六合一");
     SwitchPanle SP;
     DWORD PID;
     POINT pos;
@@ -491,6 +523,7 @@ begin:
     ST.StartThread(AutoKnife, &hwnd);
     ST.StartThread(StopBreatheWhileFire, &hwnd);
     ST.StartThread(Slide, &hwnd);
+    ST.StartThread(UnlimitedFlash, &hwnd);
 
     SendMessageA(launcher, WM_CLOSE, 0, 0);
 

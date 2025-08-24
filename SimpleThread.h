@@ -3,12 +3,6 @@
 #include "windef.h"
 #include "process.h"
 
-void HideSelf(char* argv)
-{
-	HWND hwnd = FindWindowA("ConsoleWindowClass", argv);
-	ShowWindow(hwnd, SW_HIDE);
-};
-
 bool Wait(int sec)
 {
 	clock_t beg = clock(), now = clock();
@@ -58,4 +52,5 @@ public:
 		this->hThread = (HANDLE)_beginthread(Func, 0, p);
 		return this->hThread;
 	};
+
 };

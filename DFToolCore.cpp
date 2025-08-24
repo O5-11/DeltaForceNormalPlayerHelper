@@ -296,7 +296,7 @@ void UnlimitedFlash(void* args)
 
 int main(int argc,char* argv[])
 {
-    HideSelf(argv[0]);
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
     HANDLE mutex;
     if (CheckSelfExists(mutex, "DFTOOLCORE"))
     {
@@ -378,4 +378,5 @@ END:
         goto BEGIN;
 
     return 0;
+
 }

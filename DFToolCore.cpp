@@ -1,4 +1,4 @@
-﻿
+#pragma warning(disable:4996)
 
 #include "io.h"
 #include "SCManager.h"
@@ -71,13 +71,17 @@ void ConfigThread(void* args)
 {
     HWND hwnd = NULL;
     int res = 0;
+    bool showing = false;
+
     while (!ExitTh)
     {
-        if ((GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0)
+        if ((GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 && showing == false)
         {
-            if ((GetAsyncKeyState(VK_NUMPAD0) & 0x8000) != 0)
+            if ((GetAsyncKeyState(VK_NUMPAD0) & 0x8000) != 0 && showing == false)
             {
-                res = MessageBoxA(NULL, "希望退出 选择【是】\t 希望更新配置 选择【否】\n不做变化选择【 取消 】", "选项", MB_YESNOCANCEL | MB_SYSTEMMODAL);
+                showing = true;
+
+                res = MessageBoxA(NULL, "希望退出整个程序 选择【是】\t 希望更新配置 选择【否】\n打开配置文件选择【 取消 】", "选项", MB_YESNOCANCEL | MB_SYSTEMMODAL);
 
                 hwnd = FindWindowA("#32770 (对话框)","选项");
                 while (hwnd != NULL)
@@ -87,10 +91,21 @@ void ConfigThread(void* args)
                 {
                 case IDYES:
                     Exit = true;
+                    GetAsyncKeyState(VK_LCONTROL);
+                    GetAsyncKeyState(VK_NUMPAD0);
+                    showing = false;
                     return;
-                case IDCANCEL:break;
+                case IDCANCEL:
+                    ShellExecuteA(NULL, "open", ".\\UserConfig.json", NULL, NULL, SW_SHOWNORMAL);
+                    GetAsyncKeyState(VK_LCONTROL);
+                    GetAsyncKeyState(VK_NUMPAD0);
+                    showing = false;
+                    break;
                 case IDNO:
                     Reload = true;
+                    GetAsyncKeyState(VK_LCONTROL);
+                    GetAsyncKeyState(VK_NUMPAD0);
+                    showing = false;
                     return;
                 }
             }
@@ -145,6 +160,9 @@ void CloseAntiCheat(void* args)
 void AutoKnife(void* args)
 {
     WinInfo* WI = (WinInfo*)args;
+    char key = '1';
+    if (UC.MainWeapon == false)
+        key = '4';
 
     while (!ExitTh)
     {
@@ -153,9 +171,8 @@ void AutoKnife(void* args)
             while (GetKeyState(VK_XBUTTON1) < 0)
             {
                 PressKey(VK_OEM_3);
-                Sleep(UC.KnifeTime);
-                PressKey('1');
-                Sleep(1);
+                Sleep(UC.KnifeTime + rand()%15 - 10);
+                PressKey(key);
             }
 
             Sleep(100);
@@ -330,6 +347,39 @@ BEGIN:
 
     Threads[0] = ST.StartThread(ConfigThread, NULL);
 
+    if (UC.ShowConfig)
+    {
+        std::string configinfo = "当前设置：";
+        configinfo += "\n启动时显示当前配置："; if (UC.ShowConfig)configinfo += "激活中";
+        configinfo += "\n取消刀："; if (UC.FuncSwitch.AutoKnife)configinfo += "激活中"; else configinfo += "未激活";
+        if (UC.FuncSwitch.AutoKnife) {
+            char* buff = new char[16]; memset(buff, 0, 16);
+            configinfo += "\n取消刀切换武器："; if (UC.MainWeapon)configinfo += "主武器"; else configinfo += "手枪";
+            configinfo += "\n取消刀动画时长： "; 
+            itoa(UC.KnifeTime, buff, 10);
+            configinfo += buff;
+            configinfo += " 毫秒";
+            delete[] buff;
+            buff = nullptr;
+        }
+        configinfo += "\n关闭ACE："; if (UC.FuncSwitch.CloseAce)configinfo += "激活中"; else configinfo += "未激活";
+        configinfo += "\n威慑手电："; if (UC.FuncSwitch.Flash)configinfo += "激活中"; else configinfo += "未激活";
+        if (UC.FuncSwitch.AutoKnife) {
+            char* buff = new char[16]; memset(buff, 0, 16);
+            configinfo += "\n威慑手电持续时长： ";
+            itoa(UC.FlashStopTime, buff, 10);
+            configinfo += buff;
+            configinfo += " 秒";
+            delete[] buff;
+            buff = nullptr;
+        }
+        configinfo += "\n切窗口游戏静音："; if (UC.FuncSwitch.MuteWindow)configinfo += "激活中"; else configinfo += "未激活";
+        configinfo += "\n滑步："; if (UC.FuncSwitch.Slide)configinfo += "激活中"; else configinfo += "未激活";
+        configinfo += "\n自动屏息："; if (UC.FuncSwitch.StopBreath)configinfo += "激活中"; else configinfo += "未激活";
+
+        MBX(configinfo.c_str());
+    }
+
     while (WI.hwnd == NULL)
     {
         if (Reload || Exit)
@@ -368,15 +418,28 @@ BEGIN:
 END:
 
     ExitTh = true;
+    DWORD single = WaitForMultipleObjects(7, Threads, true, INFINITE);
+    if ((single == WAIT_OBJECT_0) || (single == WAIT_ABANDONED_0)){
+        for (int i = 0; i < 7; i++)
+            CloseHandle(Threads[i]);
+    }
+    else {
+        for (int i = 0; i < 7; i++)
+        {
+            TerminateThread(Threads[i], 0);
+            CloseHandle(Threads[i]);
+        }
+    }
 
-    WaitForMultipleObjects(7, Threads, true, INFINITE);
-
-    if(!Reload)
-        TerminateTargetProcess(FindProcessId(L"delta_force_launcher.exe"));
+    if (!Reload)
+    {
+        hw = FindWindowA(WindowClass, WindowName);
+        if(hw == NULL)
+            TerminateTargetProcess(FindProcessId(L"delta_force_launcher.exe"));
+    }
 
     if(!Exit)
         goto BEGIN;
 
     return 0;
-
 }

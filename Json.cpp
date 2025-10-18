@@ -6,6 +6,8 @@
 
 void ConfigInit(UserConfig* UC)
 {
+    UC->ShowConfig = true;
+    UC->MainWeapon = true;
     UC->FlashStopTime = 5;
     UC->KnifeTime = 170;
     UC->FuncSwitch.AutoKnife = true;
@@ -18,10 +20,10 @@ void ConfigInit(UserConfig* UC)
 
 void WriteDefault() {
 
-    const char* data = "{\n\t\"FlashStopTime\": 5,\n\t\"KnifeTime\" : 170,\n\t\"FuncSwitch\" : {\n\t\t\"AutoKnife\": true,\n\t\t\"CloseAce\" : true,\n\t\t\"Flash\" : true,\n\t\t\"MuteWindow\" : true,\n\t\t\"Slide\" : true,\n\t\t\"StopBreath\" : true\n\t}\n}\n";
+    const char* data = "{\n\t\"ShowConfig\": true,\n\t\"MainWeapon\": true,\n\t\"FlashStopTime\": 5,\n\t\"KnifeTime\" : 170,\n\t\"FuncSwitch\" : {\n\t\t\"AutoKnife\": true,\n\t\t\"CloseAce\" : true,\n\t\t\"Flash\" : true,\n\t\t\"MuteWindow\" : true,\n\t\t\"Slide\" : true,\n\t\t\"StopBreath\" : true\n\t}\n}\n";
 
     std::fstream f("UserConfig.json", std::ios::out | std::ios::binary);
-    f.write(data, 189);
+    f.write(data, 231);
     f.close();
 }
 
@@ -51,6 +53,16 @@ int parse_user_config(const char* filename, UserConfig* config) {
     if (!root) {
         delete[] json_string;
         return 0;
+    }
+
+    cJSON* ShowConfig = cJSON_GetObjectItemCaseSensitive(root, "ShowConfig");
+    if (cJSON_IsBool(ShowConfig)) {
+        config->ShowConfig = cJSON_IsTrue(ShowConfig);
+    }
+
+    cJSON* MainWeapon = cJSON_GetObjectItemCaseSensitive(root, "MainWeapon");
+    if (cJSON_IsBool(MainWeapon)) {
+        config->MainWeapon = cJSON_IsTrue(MainWeapon);
     }
 
     cJSON* flashStopTime = cJSON_GetObjectItemCaseSensitive(root, "FlashStopTime");

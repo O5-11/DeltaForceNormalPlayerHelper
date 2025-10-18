@@ -15,6 +15,8 @@ typedef struct UserConfig {
     FuncSw FuncSwitch;
     int FlashStopTime;
     int KnifeTime;
+    bool MainWeapon;
+    bool ShowConfig;
 } UserConfig;
 
 void WriteDefault();
